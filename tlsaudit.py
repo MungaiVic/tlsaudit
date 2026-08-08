@@ -113,6 +113,10 @@ def scan_host(hostname: str, port: int) -> ScanReport:
             return ScanReport(hostname, port, [CheckResult("Not TLS", "Provided port does not run TLS", Verdict.WARN)])
         return ScanReport(hostname, port, [CheckResult("Not TLS", f"Provided port does not appear to run TLS ({e.reason})", Verdict.WARN)])
 
+def display_report(report: ScanReport):
+    print(f"[+] TLS Audit Report for {report.hostname}:{report.port}")
+    for result in report.results:
+        print(f"[{result.verdict.value}] {result.name}: {result.detail}")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -123,7 +127,7 @@ def main():
     print(f"[*] Auditing {args.hostname} on port {args.port}")
     report = scan_host(args.hostname, args.port)
 
-    print(report)
+    display_report(report)
 
 
 if __name__ == "__main__":
