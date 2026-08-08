@@ -59,6 +59,23 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
     except socket.timeout:
         return CheckResult(label, "Connection timed out", Verdict.WARN)
 
+def check_cipher_suite(hostname: str, port: int = 443) -> CheckResult:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((hostname, port), timeout=20) as sock:
+            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                cipher_name = ssock.cipher()[0]
+
+        if any(marker in cipher_name for marker in WEAK_CIPHER_MARKERS):
+            return CheckResult("Cipher Suite", f"Weak cipher negotiated: {cipher_name}", Verdict.FAIL)
+        else:
+            return CheckResult("Cipher Suite", f"Strong cipher suite: {cipher_name}", Verdict.PASS)
+    except socket.timeout:
+        return CheckResult("Cipher Suite", "Connection timed out", Verdict.WARN)
+
+
 def scan_host(hostname: str, port: int) -> ScanReport:
     report = ScanReport(hostname, port)
     target_versions = [
@@ -69,8 +86,14 @@ def scan_host(hostname: str, port: int) -> ScanReport:
         VersionSpec(ssl.TLSVersion.TLSv1_3, "TLS 1.3", False),
     ]
     try:
-        with socket.create_connection((hostname, port), timeout=10):
-            pass
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((hostname, port), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                pass
+        check_cipher_suite_result = check_cipher_suite(hostname, port)
+        report.results.append(check_cipher_suite_result)
         for version in target_versions:
             try:
                 result = check_protocol_version(hostname, port, version.version, version.label, version.is_deprecated)
@@ -85,17 +108,11 @@ def scan_host(hostname: str, port: int) -> ScanReport:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection timed out", Verdict.WARN)])
     except ConnectionRefusedError:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection refused", Verdict.WARN)])
+    except ssl.SSLError as e:
+        if e.reason == "RECORD_LAYER_FAILURE":
+            return ScanReport(hostname, port, [CheckResult("Not TLS", "Provided port does not run TLS", Verdict.WARN)])
+        return ScanReport(hostname, port, [CheckResult("Not TLS", f"Provided port does not appear to run TLS ({e.reason})", Verdict.WARN)])
 
-def check_cipher_suite(hostname: str, port: int = 443):
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    try:
-        with socket.create_connection((hostname, port), timeout=20) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                print(f"Cipher is: {ssock.cipher()}")
-    except socket.timeout:
-        print("[-] Connection timed out")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -105,6 +122,7 @@ def main():
 
     print(f"[*] Auditing {args.hostname} on port {args.port}")
     report = scan_host(args.hostname, args.port)
+
     print(report)
 
 
