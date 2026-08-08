@@ -8,6 +8,8 @@ from enum import Enum
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+WEAK_CIPHER_MARKERS = ["RC4", "3DES", "NULL", "EXPORT", "CBC"]
+
 class Verdict(Enum):
     PASS = "PASS"
     FAIL = "FAIL"
@@ -46,10 +48,14 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
                     return CheckResult(label, "Deprecated", Verdict.FAIL)
                 return CheckResult(label, "Supported", Verdict.PASS)
 
-    except ssl.SSLError:
+    except ssl.SSLError as e:
+
+        if e.reason == "NO_SHARED_CIPHER":
+            return CheckResult(label, "No shared cipher", Verdict.WARN)
+        elif e.reason == "NO_PROTOCOLS_AVAILABLE":
+            return CheckResult(label, "No protocols available", Verdict.WARN)
         if is_deprecated:
             return CheckResult(label, "Not supported & Deprecated", Verdict.PASS)
-        return None
     except socket.timeout:
         return CheckResult(label, "Connection timed out", Verdict.WARN)
 
@@ -69,7 +75,7 @@ def scan_host(hostname: str, port: int) -> ScanReport:
                 report.results.append(result)
         return report
     except Exception as e:
-        print(f"[-] Error scanning {hostname}: {e}")
+        return ScanReport(hostname, port, [CheckResult("Error", str(e), Verdict.FAIL)])
 
 def check_cipher_suite(hostname: str, port: int = 443):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -89,7 +95,8 @@ def main():
     args = parser.parse_args()
 
     print(f"[*] Auditing {args.hostname} on port {args.port}")
-    scan_host(args.hostname, args.port)
+    report = scan_host(args.hostname, args.port)
+    print(report)
 
 
 if __name__ == "__main__":
