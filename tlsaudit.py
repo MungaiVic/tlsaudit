@@ -62,20 +62,29 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
 def scan_host(hostname: str, port: int) -> ScanReport:
     report = ScanReport(hostname, port)
     target_versions = [
+        VersionSpec(ssl.TLSVersion.SSLv3, "SSL 3.0", True),
         VersionSpec(ssl.TLSVersion.TLSv1, "TLS 1.0", True),
         VersionSpec(ssl.TLSVersion.TLSv1_1, "TLS 1.1", True),
         VersionSpec(ssl.TLSVersion.TLSv1_2, "TLS 1.2", False),
         VersionSpec(ssl.TLSVersion.TLSv1_3, "TLS 1.3", False),
-        VersionSpec(ssl.TLSVersion.SSLv3, "SSL 3.0", True),
     ]
     try:
+        with socket.create_connection((hostname, port), timeout=10):
+            pass
         for version in target_versions:
-            result = check_protocol_version(hostname, port, version.version, version.label, version.is_deprecated)
-            if result:
-                report.results.append(result)
+            try:
+                result = check_protocol_version(hostname, port, version.version, version.label, version.is_deprecated)
+                if result:
+                    report.results.append(result)
+            except Exception as e:
+                report.results.append(CheckResult(version.label, f"Could not complete check: {str(e)}", Verdict.WARN))
         return report
-    except Exception as e:
-        return ScanReport(hostname, port, [CheckResult("Error", str(e), Verdict.FAIL)])
+    except socket.gaierror:
+        return ScanReport(hostname, port, [CheckResult("Hostname", "Could not resolve hostname", Verdict.WARN)])
+    except socket.timeout:
+        return ScanReport(hostname, port, [CheckResult("Connection", "Connection timed out", Verdict.WARN)])
+    except ConnectionRefusedError:
+        return ScanReport(hostname, port, [CheckResult("Connection", "Connection refused", Verdict.WARN)])
 
 def check_cipher_suite(hostname: str, port: int = 443):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
