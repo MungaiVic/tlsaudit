@@ -2,6 +2,7 @@ import ssl
 import argparse
 import socket
 import warnings
+from collections import Counter
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -9,6 +10,7 @@ from enum import Enum
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 WEAK_CIPHER_MARKERS = ["RC4", "3DES", "NULL", "EXPORT", "CBC"]
+NOT_TLS_CHECK_NAME = "Not TLS"
 
 class Verdict(Enum):
     PASS = "PASS"
@@ -108,15 +110,35 @@ def scan_host(hostname: str, port: int) -> ScanReport:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection timed out", Verdict.WARN)])
     except ConnectionRefusedError:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection refused", Verdict.WARN)])
+    except ConnectionResetError:
+        return ScanReport(hostname, port, [CheckResult("Connection", "Connection reset", Verdict.WARN)])
     except ssl.SSLError as e:
         if e.reason == "RECORD_LAYER_FAILURE":
-            return ScanReport(hostname, port, [CheckResult("Not TLS", "Provided port does not run TLS", Verdict.WARN)])
-        return ScanReport(hostname, port, [CheckResult("Not TLS", f"Provided port does not appear to run TLS ({e.reason})", Verdict.WARN)])
-
+            return ScanReport(hostname, port,
+                              [CheckResult(NOT_TLS_CHECK_NAME, "Provided port does not run TLS", Verdict.WARN)])
+        return ScanReport(hostname, port,
+                          [CheckResult(NOT_TLS_CHECK_NAME, f"Provided port does not appear to run TLS ({e.reason})",
+                                       Verdict.WARN)])
+    except OSError as e:
+        return ScanReport(hostname, port, [CheckResult("Network Error", f"OS Error: {e}", Verdict.WARN)])
 def display_report(report: ScanReport):
     print(f"[+] TLS Audit Report for {report.hostname}:{report.port}")
+    if len(report.results) == 1 and report.results[0].name == NOT_TLS_CHECK_NAME:
+        print('-' * 40)
+        print(f"[!] NOT A TLS service: {report.results[0].detail}")
+        print('-' * 40)
+        return
+
     for result in report.results:
         print(f"[{result.verdict.value}] {result.name}: {result.detail}")
+
+    verdict_count = Counter({v: 0 for v in Verdict})
+    verdict_count.update(result.verdict for result in report.results)
+
+    summary_part = [f"{v.value}: {verdict_count[v]}" for v in Verdict]
+    one_liner = " | ".join(summary_part)
+    print(f"\n[+] Verdict Summary: {one_liner}")
+
 
 def main():
     parser = argparse.ArgumentParser()
