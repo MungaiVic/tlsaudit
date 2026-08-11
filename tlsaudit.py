@@ -1,9 +1,8 @@
-import ssl
 import argparse
 import socket
+import ssl
 import warnings
 from collections import Counter
-
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -44,8 +43,8 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
     context.minimum_version = context.maximum_version = version
 
     try:
-        with socket.create_connection((hostname, port), timeout=20) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+        with socket.create_connection((hostname, port), timeout=20) as sock, \
+            context.wrap_socket(sock, server_hostname=hostname) as ssock:
                 if is_deprecated:
                     return CheckResult(label, "Deprecated", Verdict.FAIL)
                 return CheckResult(label, "Supported", Verdict.PASS)
@@ -58,7 +57,7 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
             return CheckResult(label, "No protocols available", Verdict.WARN)
         if is_deprecated:
             return CheckResult(label, "Not supported & Deprecated", Verdict.PASS)
-    except socket.timeout:
+    except TimeoutError:
         return CheckResult(label, "Connection timed out", Verdict.WARN)
 
 def check_cipher_suite(hostname: str, port: int = 443) -> CheckResult:
@@ -66,15 +65,15 @@ def check_cipher_suite(hostname: str, port: int = 443) -> CheckResult:
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     try:
-        with socket.create_connection((hostname, port), timeout=20) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+        with socket.create_connection((hostname, port), timeout=20) as sock, \
+            context.wrap_socket(sock, server_hostname=hostname) as ssock:
                 cipher_name = ssock.cipher()[0]
 
         if any(marker in cipher_name for marker in WEAK_CIPHER_MARKERS):
             return CheckResult("Cipher Suite", f"Weak cipher negotiated: {cipher_name}", Verdict.FAIL)
         else:
             return CheckResult("Cipher Suite", f"Strong cipher suite: {cipher_name}", Verdict.PASS)
-    except socket.timeout:
+    except TimeoutError:
         return CheckResult("Cipher Suite", "Connection timed out", Verdict.WARN)
 
 
@@ -102,11 +101,11 @@ def scan_host(hostname: str, port: int) -> ScanReport:
                 if result:
                     report.results.append(result)
             except Exception as e:
-                report.results.append(CheckResult(version.label, f"Could not complete check: {str(e)}", Verdict.WARN))
+                report.results.append(CheckResult(version.label, f"Could not complete check: {e!s}", Verdict.WARN))
         return report
     except socket.gaierror:
         return ScanReport(hostname, port, [CheckResult("Hostname", "Could not resolve hostname", Verdict.WARN)])
-    except socket.timeout:
+    except TimeoutError:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection timed out", Verdict.WARN)])
     except ConnectionRefusedError:
         return ScanReport(hostname, port, [CheckResult("Connection", "Connection refused", Verdict.WARN)])
@@ -121,6 +120,8 @@ def scan_host(hostname: str, port: int) -> ScanReport:
                                        Verdict.WARN)])
     except OSError as e:
         return ScanReport(hostname, port, [CheckResult("Network Error", f"OS Error: {e}", Verdict.WARN)])
+
+
 def display_report(report: ScanReport):
     print(f"[+] TLS Audit Report for {report.hostname}:{report.port}")
     if len(report.results) == 1 and report.results[0].name == NOT_TLS_CHECK_NAME:
