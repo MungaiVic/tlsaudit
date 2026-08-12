@@ -24,7 +24,7 @@ class VersionSpec:
 
 @dataclass
 class CheckResult:
-    name: str # which check this is, e.g. "TLS 1.0" or "Cipher Suite"
+    name: str # which check this is, e.g. "TLS 1.0" or "Cipher Suite"?
     detail: str
     verdict: Verdict
 
@@ -44,7 +44,7 @@ def check_protocol_version(hostname: str, port: int, version: ssl.TLSVersion, la
 
     try:
         with socket.create_connection((hostname, port), timeout=20) as sock, \
-            context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            context.wrap_socket(sock, server_hostname=hostname):
                 if is_deprecated:
                     return CheckResult(label, "Deprecated", Verdict.FAIL)
                 return CheckResult(label, "Supported", Verdict.PASS)
@@ -90,8 +90,8 @@ def scan_host(hostname: str, port: int) -> ScanReport:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
-        with socket.create_connection((hostname, port), timeout=10) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+        with socket.create_connection((hostname, port), timeout=10) as sock, \
+            context.wrap_socket(sock, server_hostname=hostname):
                 pass
         check_cipher_suite_result = check_cipher_suite(hostname, port)
         report.results.append(check_cipher_suite_result)
