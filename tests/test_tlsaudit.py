@@ -66,3 +66,14 @@ def test_deprecated_version_no_shared_cipher_returns_warn(mocker):
 
     assert result is not None
     assert result.verdict == Verdict.WARN
+
+def test_timeout_returns_warn(mocker):
+    timeout_error = TimeoutError()
+    mocker.patch("ssl.SSLContext.wrap_socket", return_value=mocker.MagicMock())
+    mock_create_connection = mocker.patch("socket.create_connection", side_effect=timeout_error)
+    result = check_protocol_version("example.com", 443,
+                                    version=ssl.TLSVersion.TLSv1, label="TLS 1.0",
+                                    is_deprecated=False)
+    mock_create_connection.assert_called_once_with(("example.com", 443), timeout=20)
+    assert result is not None
+    assert result.verdict == Verdict.WARN
