@@ -18,7 +18,7 @@ def test_deprecated_version_accepted_returns_fail(
 
     result = check_protocol_version(
         "example.com", 443,
-        version, label, is_deprecated)
+        version=version, label=label, is_deprecated=is_deprecated)
 
     mock_create_connection.assert_called_once_with(("example.com", 443), timeout=20)
     assert result is not None
