@@ -51,3 +51,18 @@ def test_current_version_accepted_returns_pass(mocker, version, label, is_deprec
     mock_create_connection.assert_called_once_with(("example.com", 443), timeout=20)
     assert result is not None
     assert result.verdict == Verdict.PASS
+
+
+def test_deprecated_version_no_shared_cipher_returns_warn(mocker):
+    fake_error = ssl.SSLError("Simulated")
+    fake_error.reason = "NO_SHARED_CIPHER"
+
+    mocker.patch("ssl.SSLContext.wrap_socket", side_effect=fake_error)
+    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
+
+    result = check_protocol_version("example.com", 443,
+                                    version=ssl.TLSVersion.TLSv1, label="TLS 1.0",
+                                    is_deprecated=True)
+
+    assert result is not None
+    assert result.verdict == Verdict.WARN
