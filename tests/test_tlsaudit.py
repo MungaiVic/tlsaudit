@@ -82,3 +82,14 @@ def test_timeout_returns_warn(mocker):
     mock_create_connection.assert_called_once_with(("example.com", 443), timeout=20)
     assert result is not None
     assert result.verdict == Verdict.WARN
+
+
+def test_handshake_failure_returns_warn(mocker):
+    fake_error= ssl.SSLError("Handshake failure")
+    fake_error.reason = "HANDSHAKE_FAILURE"
+    mocker.patch("ssl.SSLContext.wrap_socket", side_effect=fake_error)
+    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
+    result = check_protocol_version("example.com", 443,
+                                    version=ssl.TLSVersion.TLSv1_3, label="TLS 1.3",
+                                    is_deprecated=False)
+    assert result is None
