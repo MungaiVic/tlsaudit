@@ -2,7 +2,12 @@ import ssl
 
 import pytest
 
-from tlsaudit import Verdict, check_protocol_version
+from tlsaudit import (
+    WEAK_CIPHER_MARKERS,
+    Verdict,
+    check_cipher_suite,
+    check_protocol_version,
+)
 
 
 @pytest.mark.parametrize("version,label,is_deprecated", [
@@ -93,3 +98,21 @@ def test_handshake_failure_returns_warn(mocker):
                                     version=ssl.TLSVersion.TLSv1_3, label="TLS 1.3",
                                     is_deprecated=False)
     assert result is None
+
+
+@pytest.mark.parametrize("cipher_name,expected_verdict", [
+    ("ECDHE-RSA-AES256-GCM-SHA384", Verdict.PASS),
+    ("ECDHE-RSA-RC4-SHA", Verdict.FAIL),
+    ("ECDHE-RSA-DES-CBC3-SHA", Verdict.FAIL),
+], ids=["strong_aes_gcm", "weak_rc4", "weak_cbc"])
+def test_cipher_suite_returns_expected_verdict(mocker, cipher_name, expected_verdict):
+    mock_ssock = mocker.MagicMock()
+    mock_ssock.__enter__.return_value = mock_ssock
+    mock_ssock.cipher.return_value = (cipher_name,)
+    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
+    mocker.patch("ssl.SSLContext.wrap_socket", return_value=mock_ssock)
+
+    result = check_cipher_suite("example.com", 443)
+
+    assert result is not None
+    assert result.verdict == expected_verdict
