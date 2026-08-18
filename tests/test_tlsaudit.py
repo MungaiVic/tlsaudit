@@ -25,15 +25,34 @@ def test_deprecated_version_accepted_returns_fail(
     assert result.verdict == Verdict.FAIL
 
 
-def test_deprecated_version_rejected_returns_pass(mocker):
+@pytest.mark.parametrize("reason,is_deprecated,expected_verdict", [
+    ("HANDSHAKE_FAILURE", True, Verdict.PASS),
+    ("NO_SHARED_CIPHER", True, Verdict.WARN),
+    ("NO_SHARED_CIPHER", False, Verdict.WARN),
+    ("NO_PROTOCOLS_AVAILABLE", True, Verdict.WARN),
+    ("NO_PROTOCOLS_AVAILABLE", False, Verdict.WARN),
+], ids=["generic_fallback", "no_shared_cipher_deprecated", "no_shared_cipher_not_deprecated",
+        "no_protocols_available_deprecated", "no_protocols_available_not_deprecated"])
+def test_deprecated_version_ssl_error_reason(mocker, reason, is_deprecated, expected_verdict):
+    """Verify check_protocol_version's verdict for each known SSLError reason.
+
+    NO_SHARED_CIPHER and NO_PROTOCOLS_AVAILABLE are local/negotiation
+    limitations and must verdict WARN regardless of is_deprecated (tested
+    with both True and False). HANDSHAKE_FAILURE represents a genuine
+    server-side rejection and only makes sense with is_deprecated=True —
+    the False case for that reason returns None, not a verdict, and is
+    covered separately.
+    """
     fake_error = ssl.SSLError("Simulated")
-    fake_error.reason = "HANDSHAKE_FAILURE"
+    fake_error.reason = reason
     mocker.patch("ssl.SSLContext.wrap_socket", side_effect=fake_error)
     mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
 
-    result = check_protocol_version("example.com", 443, ssl.TLSVersion.TLSv1, "TLS 1.0", True)
+    result = check_protocol_version("example.com", 443,
+                                    version=ssl.TLSVersion.TLSv1, label="TLS 1.0",
+                                    is_deprecated=is_deprecated)
     assert result is not None
-    assert result.verdict == Verdict.PASS
+    assert result.verdict == expected_verdict
 
 
 @pytest.mark.parametrize("version,label,is_deprecated", [
@@ -52,20 +71,6 @@ def test_current_version_accepted_returns_pass(mocker, version, label, is_deprec
     assert result is not None
     assert result.verdict == Verdict.PASS
 
-
-def test_deprecated_version_no_shared_cipher_returns_warn(mocker):
-    fake_error = ssl.SSLError("Simulated")
-    fake_error.reason = "NO_SHARED_CIPHER"
-
-    mocker.patch("ssl.SSLContext.wrap_socket", side_effect=fake_error)
-    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
-
-    result = check_protocol_version("example.com", 443,
-                                    version=ssl.TLSVersion.TLSv1, label="TLS 1.0",
-                                    is_deprecated=True)
-
-    assert result is not None
-    assert result.verdict == Verdict.WARN
 
 def test_timeout_returns_warn(mocker):
     timeout_error = TimeoutError()
