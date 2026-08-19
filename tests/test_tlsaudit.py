@@ -1,3 +1,4 @@
+import socket
 import ssl
 
 import pytest
@@ -7,6 +8,7 @@ from tlsaudit import (
     Verdict,
     check_cipher_suite,
     check_protocol_version,
+    scan_host,
 )
 
 
@@ -116,3 +118,38 @@ def test_cipher_suite_returns_expected_verdict(mocker, cipher_name, expected_ver
 
     assert result is not None
     assert result.verdict == expected_verdict
+
+
+@pytest.mark.parametrize("exception, expected_name, expected_detail",[
+    (socket.gaierror(), "Hostname", "Could not resolve hostname"),
+    (TimeoutError(), "Connection", "Connection timed out"),
+    (ConnectionRefusedError(), "Connection", "Connection refused"),
+    (ConnectionResetError(), "Connection", "Connection reset"),
+    (OSError("Simulated"), "Network Error", "OS Error: Simulated"),
+    ], ids=["gaierror", "timeout", "connection_refused", "connection_reset", "os_error"])
+def test_scan_host_stage1_failure(mocker, exception, expected_name, expected_detail):
+    mocker.patch("socket.create_connection", side_effect=exception)
+    report = scan_host("example.com", 443)
+
+
+    assert len(report.results) == 1
+    assert report.results[0].name == expected_name
+    assert report.results[0].detail == expected_detail
+    assert report.results[0].verdict == Verdict.WARN
+
+
+@pytest.mark.parametrize("reason,expected_detail", [
+    ("RECORD_LAYER_FAILURE", "Provided port does not run TLS"),
+    ("NO_SHARED_CIPHER", "Provided port does not appear to run TLS (NO_SHARED_CIPHER)"),
+], ids=["record_layer_failure", "no_shared_cipher"])
+def test_scan_host_stage1_ssl_error(mocker, reason, expected_detail):
+    fake_error = ssl.SSLError()
+    fake_error.reason = reason
+    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
+    mocker.patch("ssl.SSLContext.wrap_socket", side_effect=fake_error)
+    report = scan_host("example.com", 443)
+
+    assert len(report.results) == 1
+    assert report.results[0].name == "Not TLS"
+    assert report.results[0].detail == expected_detail
+    assert report.results[0].verdict == Verdict.WARN
