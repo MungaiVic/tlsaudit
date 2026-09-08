@@ -13,7 +13,7 @@ NOT_TLS_CHECK_NAME = "Not TLS"
 
 
 class Verdict(Enum):
-    PASS = "PASS"
+    PASS = "PASS"  # nosec: B105 - num member, not a credential; Bandit's heuristic matches on the name "PASS"
     FAIL = "FAIL"
     WARN = "WARN"
 
@@ -63,6 +63,7 @@ def check_protocol_version(
             return CheckResult(label, "No protocols available", Verdict.WARN)
         if is_deprecated:
             return CheckResult(label, "Not supported & Deprecated", Verdict.PASS)
+        return CheckResult(label, "Not supported", Verdict.FAIL)
     except TimeoutError:
         return CheckResult(label, "Connection timed out", Verdict.WARN)
 
@@ -76,7 +77,10 @@ def check_cipher_suite(hostname: str, port: int = 443) -> CheckResult:
             socket.create_connection((hostname, port), timeout=20) as sock,
             context.wrap_socket(sock, server_hostname=hostname) as ssock,
         ):
-            cipher_name = ssock.cipher()[0]
+            cipher_info = ssock.cipher()
+            if cipher_info is None:
+                return CheckResult("Cipher Suite", "No cipher negotiated", Verdict.WARN)
+            cipher_name = cipher_info[0]
 
         if any(marker in cipher_name for marker in WEAK_CIPHER_MARKERS):
             return CheckResult(
