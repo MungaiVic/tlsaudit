@@ -34,13 +34,17 @@ explicitly setting only the attributes it needs:
 
 ```python
 import ssl
+
 ...
+
+
 def check_protocol_version(hostname, port, version, label, is_deprecated):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     context.minimum_version = context.maximum_version = version
     ...
+
 
 def check_cipher_suite(hostname, port=443):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
