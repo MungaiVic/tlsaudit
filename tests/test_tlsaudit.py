@@ -4,12 +4,14 @@ import ssl
 import pytest
 
 from tlsaudit import (
+    NOT_TLS_CHECK_NAME,
     WEAK_CIPHER_MARKERS,
+    CheckResult,
+    ScanReport,
     Verdict,
     check_cipher_suite,
     check_protocol_version,
-    scan_host,
-    ScanReport,
+    scan_host, display_report
 )
 
 
@@ -178,3 +180,31 @@ def test_scan_host_success_assembles_full_report(mocker):
 
     assert report.results[5].name == "TLS 1.3"
     assert report.results[5].verdict == Verdict.PASS
+
+
+def test_display_report_prints_verdict_lines_and_summary(capsys):
+    report = ScanReport("example.com", 443, [
+        CheckResult("Cipher Suite", "Strong cipher suite: TLS_AES_256_GCM_SHA384", Verdict.PASS),
+        CheckResult("TLS 1.0", "Deprecated", Verdict.FAIL),
+        CheckResult("TLS 1.2", "Connection timed out", Verdict.WARN),
+    ])
+
+    display_report(report)
+    output = capsys.readouterr().out
+
+    assert "[PASS] Cipher Suite: Strong cipher suite: TLS_AES_256_GCM_SHA384" in output
+    assert "[FAIL] TLS 1.0: Deprecated" in output
+    assert "[WARN] TLS 1.2: Connection timed out" in output
+    assert "PASS: 1 | FAIL: 1 | WARN: 1" in output
+
+
+def test_display_report_not_tls_shows_banner_not_table(capsys):
+    report = ScanReport("example.com", 80, [
+        CheckResult(NOT_TLS_CHECK_NAME, "Provided port does not run TLS", Verdict.WARN),
+    ])
+
+    display_report(report)
+    output = capsys.readouterr().out
+
+    assert "NOT A TLS service" in output
+    assert "[WARN]" not in output
