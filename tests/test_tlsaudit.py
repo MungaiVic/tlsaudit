@@ -9,6 +9,7 @@ from tlsaudit import (
     check_cipher_suite,
     check_protocol_version,
     scan_host,
+    ScanReport,
 )
 
 
@@ -153,3 +154,27 @@ def test_scan_host_stage1_ssl_error(mocker, reason, expected_detail):
     assert report.results[0].name == "Not TLS"
     assert report.results[0].detail == expected_detail
     assert report.results[0].verdict == Verdict.WARN
+
+def test_scan_host_success_assembles_full_report(mocker):
+    mock_ssock = mocker.MagicMock()
+    mock_ssock.__enter__.return_value = mock_ssock
+    mock_ssock.cipher.return_value = ("ECDHE-RSA-AES256-GCM-SHA384",)
+    mocker.patch("socket.create_connection", return_value=mocker.MagicMock())
+    mocker.patch("ssl.SSLContext.wrap_socket", return_value=mock_ssock)
+    report = scan_host("example.com", 443)
+
+    assert len(report.results) == 6
+    assert report.results[1].name == "SSL 3.0"
+    assert report.results[1].verdict == Verdict.FAIL
+
+    assert report.results[2].name == "TLS 1.0"
+    assert report.results[2].verdict == Verdict.FAIL
+
+    assert report.results[3].name == "TLS 1.1"
+    assert report.results[3].verdict == Verdict.FAIL
+
+    assert report.results[4].name == "TLS 1.2"
+    assert report.results[4].verdict == Verdict.PASS
+
+    assert report.results[5].name == "TLS 1.3"
+    assert report.results[5].verdict == Verdict.PASS
