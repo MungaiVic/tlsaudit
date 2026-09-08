@@ -63,7 +63,7 @@ def check_protocol_version(
             return CheckResult(label, "No protocols available", Verdict.WARN)
         if is_deprecated:
             return CheckResult(label, "Not supported & Deprecated", Verdict.PASS)
-        return CheckResult(label, "Not supported", Verdict.FAIL)
+        return None
     except TimeoutError:
         return CheckResult(label, "Connection timed out", Verdict.WARN)
 
