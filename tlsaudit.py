@@ -121,7 +121,7 @@ def scan_host(hostname: str, port: int) -> ScanReport:
                 )
                 if result:
                     report.results.append(result)
-            except Exception as e: # noqa: BLE001 — deliberate safety net; check_protocol_version already handles its known exception types internally
+            except Exception as e:  # noqa: BLE001 — deliberate safety net; check_protocol_version already handles its known exception types internally
                 report.results.append(
                     CheckResult(
                         version.label, f"Could not complete check: {e!s}", Verdict.WARN
