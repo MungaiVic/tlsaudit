@@ -8,11 +8,9 @@ from tlsaudit import (
     CheckResult,
     ScanReport,
     Verdict,
-    check_cipher_suite,
-    check_protocol_version,
     display_report,
-    scan_host,
 )
+from tlsaudit.scanner import check_cipher_suite, check_protocol_version, scan_host
 
 
 @pytest.mark.parametrize(
