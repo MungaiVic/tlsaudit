@@ -4,7 +4,47 @@ A command-line TLS/cipher auditor. Points at a host, tests which TLS/SSL protoco
 versions it accepts and how strong its negotiated cipher suite is, then reports
 findings as a simple PASS/FAIL/WARN table.
 
-Standard library only (`ssl`, `socket`, `argparse`), no dependencies to install.
+Zero runtime dependencies (standard library `ssl`/`socket` only). Fully tested,
+CI-enforced (pytest, ruff, bandit, mypy, pip-audit) on every change.
+
+## Install
+
+```bash
+pip install tlsaudit
+```
+
+## Usage
+
+```bash
+tlsaudit <hostname> [--port PORT]
+```
+
+Port defaults to 443.
+
+Example:
+
+```
+$ tlsaudit github.com
+[*] Auditing github.com on port 443
+[+] TLS Audit Report for github.com:443
+[PASS] Cipher Suite: Strong cipher suite: TLS_AES_256_GCM_SHA384
+[PASS] TLS 1.2: Supported
+[PASS] TLS 1.3: Supported
+
+[+] Verdict Summary: PASS: 3 | FAIL: 0 | WARN: 0
+```
+
+If the target isn't running TLS at all (wrong port, plain HTTP, etc.), the tool
+prints a distinct banner instead of the normal table:
+
+```
+$ tlsaudit example.com --port 80
+[*] Auditing example.com on port 80
+[+] TLS Audit Report for example.com:80
+------------------------------------------------------------
+[!] NOT A TLS service: Provided port does not run TLS
+------------------------------------------------------------
+```
 
 ## What it checks
 
@@ -23,39 +63,6 @@ individually by pinning the handshake to each version in turn.
 **Cipher suite strength** — connects normally (letting the server negotiate freely)
 and checks the resulting cipher name against known-weak markers: `RC4`, `3DES`,
 `NULL`, `EXPORT`, `CBC`.
-
-## Usage
-
-```bash
-python3 tlsaudit.py <hostname> [--port PORT]
-```
-
-Port defaults to 443.
-
-Example:
-
-```
-$ python3 tlsaudit.py github.com
-[*] Auditing github.com on port 443
-[+] TLS Audit Report for github.com:443
-[PASS] Cipher Suite: Strong cipher suite: TLS_AES_256_GCM_SHA384
-[PASS] TLS 1.2: Supported
-[PASS] TLS 1.3: Supported
-
-[+] Verdict Summary: PASS: 3 | FAIL: 0 | WARN: 0
-```
-
-If the target isn't running TLS at all (wrong port, plain HTTP, etc.), the tool
-prints a distinct banner instead of the normal table:
-
-```
-$ python3 tlsaudit.py example.com --port 80
-[*] Auditing example.com on port 80
-[+] TLS Audit Report for example.com:80
-------------------------------------------------------------
-[!] NOT A TLS service: Provided port does not run TLS
-------------------------------------------------------------
-```
 
 ## Known limitations (by design, not bugs)
 
@@ -83,6 +90,15 @@ This is Phase 1 of a larger plan:
 - **Phase 3** — batch scanning from a host list, JSON output
 - **Phase 4** — HTTP security headers, A-F scoring, CAA/OCSP checks, and more
 
+## Development
+
+```bash
+git clone https://github.com/MungaiVic/tlsaudit.git
+cd tlsaudit
+uv sync --all-groups
+uv run python -m pytest -v
+```
+
 ## Responsible Usage
 
 **DO NOT** scan hosts you are not expressly authorized to do so. Doing so may land you in trouble with
@@ -90,4 +106,4 @@ the owners of the host. Therefore, seek permission from the owner before scannin
 
 ## License
 
-TBD, add MIT or Apache 2.0 once decided.
+MIT — see [LICENSE](LICENSE).
