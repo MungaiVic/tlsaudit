@@ -83,6 +83,11 @@ This is Phase 1 of a larger plan:
 - **Phase 3** — batch scanning from a host list, JSON output
 - **Phase 4** — HTTP security headers, A-F scoring, CAA/OCSP checks, and more
 
+## Responsible Usage
+
+**DO NOT** scan hosts you are not expressly authorized to do so. Doing so may land you in trouble with
+the owners of the host. Therefore, seek permission from the owner before scanning.
+
 ## License
 
 TBD, add MIT or Apache 2.0 once decided.

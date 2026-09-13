@@ -1,5 +1,24 @@
 [project]
 name = "tlsaudit"
 version = "0.1.0"
+description = "A command-line TLS/cipher auditor. Points at a host, tests which TLS/SSL protocol versions it accepts and how strong its negotiated cipher suite is, then reports findings as a simple PASS/FAIL/WARN table."
+readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []
+
+[project.scripts]
+tlsaudit = "tlsaudit:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.9.4",
+    "mypy>=2.3.0",
+    "pip-audit>=2.10.1",
+    "pytest>=9.1.1",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.16.2",
+]

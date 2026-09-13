@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "chore/**", "feature/**", "fix/**", "test/**", "docs/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install Dependencies
+        run: uv sync --all-groups
+
+      - name: Run Tests
+        run: uv run python -m pytest -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: uv sync --all-groups
+
+    - name: Ruff check
+      run: uv run ruff check .
+
+    - name: Ruff format check
+      run: uv run ruff format --check .
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Bandit
+        run: uv run bandit -r . --exclude ./tests,./.venv
+
+      - name: pip-audit
+        run: uv run pip-audit
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: mypy
+        run: uv run mypy src/
